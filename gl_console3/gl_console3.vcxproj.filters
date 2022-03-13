@@ -24,6 +24,9 @@
     <ClCompile Include="src\render.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\text.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\console.h">
