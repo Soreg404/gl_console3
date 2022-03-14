@@ -26,7 +26,7 @@ void Console::prepText() {
 
 	if(FT_New_Face(library, "C:/Windows/Fonts/arial.ttf", 0, &face)) { LOG("an error occured while loading font face"); return; }
 
-	FT_Set_Pixel_Sizes(face, 0, 16);
+	FT_Set_Pixel_Sizes(face, 0, 48);
 
 	prepShd(
 		R"(#version 430 core
@@ -39,10 +39,10 @@ void Console::prepText() {
 			tc = ivec2(tex, color);
 			gl_Position = vec4(pos, 0, 1);
 			switch(gl_VertexID % 4) {
-				case 0: texCoord = vec2(1, 0); break;
-				case 1: texCoord = vec2(1, 1); break;
-				case 2: texCoord = vec2(0, 1); break;
-				case 3: texCoord = vec2(0, 0); break;
+				case 0: texCoord = vec2(0, 0); break;
+				case 1: texCoord = vec2(0, 1); break;
+				case 2: texCoord = vec2(1, 1); break;
+				case 3: texCoord = vec2(1, 0); break;
 			}
 		})"
 	,
@@ -57,6 +57,7 @@ void Console::prepText() {
 			//color = vec4(texCoord, 0, 1);
 		}
 		)");
+	glUseProgram(4);
 	for(int i = 0; i < 32; i++) glUniform1iv(5 + i, 1, &i);
 
 }
@@ -106,8 +107,8 @@ void setTextures(FT_Face &face, charmap *m) {
 
 void setPositions(charmap *m, const char *text) {
 
-	float scale = .1f;
-	float lineHeight = .1f;
+	float scale = .005f;
+	float lineHeight = .3f;
 
 	float advance = 0;
 	size_t line = 0;
@@ -120,15 +121,15 @@ void setPositions(charmap *m, const char *text) {
 		if(found == m->end()) continue;
 		CharInfo *ci = &found->second;
 
-		x = advance * scale;
-		y = line * lineHeight;
+		x = advance * scale + ci->l * scale;
+		y = -(line * lineHeight) + ci->t * scale;
 		w = ci->w * scale;
 		h = ci->h * scale;
 
-		ci->pos.push_back({x, y, x + w, y - h});
+		ci->pos.push_back({x, y, w, h});
 
 		advance += (ci->a >> 6);
-		if(advance > 100) { line++; advance = 0; }
+		if(advance > 200) { line++; advance = 0; }
 
 	}
 }
@@ -158,23 +159,23 @@ void setBuffers(charmap *m, const char *text) {
 	Vertex *verts = new Vertex[totalCharCount * 4];
 	size_t vert_counter = 0;
 
-	char c = 0;
-	for(size_t i = 0; c = text[i]; i++) {
-		auto found = m->find(c);
-		if(found == m->end()) continue;
-		CharInfo *ci = &found->second;
+	GLenum texCounter = 0;
+	for(auto &it : *m) {
+		CharInfo &ci = it.second;
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, ci->tex);
+		glActiveTexture(GL_TEXTURE0 + texCounter);
+		glBindTexture(GL_TEXTURE_2D, ci.tex);
 
-		verts[vert_counter * 4 + 0] = Vertex(0, 0, 0, ~0);
-		verts[vert_counter * 4 + 1] = Vertex(0, -.5f, 0, ~0);
-		verts[vert_counter * 4 + 2] = Vertex(.5f, -.5f, 0, ~0);
-		verts[vert_counter * 4 + 3] = Vertex(.5f, 0, 0, ~0);
+		for(auto &cp : ci.pos) {
+			verts[vert_counter * 4 + 0] = Vertex(cp.x, cp.y, texCounter, ~0);
+			verts[vert_counter * 4 + 1] = Vertex(cp.x, cp.y - cp.w, texCounter, ~0);
+			verts[vert_counter * 4 + 2] = Vertex(cp.x + cp.z, cp.y - cp.w, texCounter, ~0);
+			verts[vert_counter * 4 + 3] = Vertex(cp.x + cp.z, cp.y, texCounter, ~0);
+			vert_counter++;
+		}
 
-		vert_counter++;
+		texCounter++;
 
-		break;
 
 	}
 
@@ -197,11 +198,12 @@ void Console::drawText() {
 
 	glViewport(x, y, wW - x - layout.bar_right * wWh, wH - y - layout.toolbar * wHh);
 
+	GLERR;
 
 	glUseProgram(4);
 
 
-	const char *tx = "Hbcd test";
+	const char *tx = "Hello world!";
 
 	charmap chMap = buildCharmap(tx);
 
@@ -211,7 +213,8 @@ void Console::drawText() {
 
 	setBuffers(&chMap, tx);
 
-	glDrawArrays(GL_QUADS, 0, 16);
+	LOG("draw call");
+	glDrawArrays(GL_QUADS, 0, 400);
 
 	GLERR;
 

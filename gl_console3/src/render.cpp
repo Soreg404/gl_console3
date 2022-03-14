@@ -65,7 +65,7 @@ void Console::prepRenderer() {
 }
 
 void drawQuad(glm::vec2 pos1, glm::vec2 pos2, Color color) {
-
+	
 	glBindVertexArray(1);
 	glUseProgram(1);
 
