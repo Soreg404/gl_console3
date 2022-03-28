@@ -164,14 +164,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="gl\gl.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\console.cpp" />
-    <ClCompile Include="src\render.cpp" />
+    <ClCompile Include="src\interface.cpp" />
     <ClCompile Include="src\text.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="gl\ext_gl.h" />
+    <ClInclude Include="gl\gl.h" />
     <ClInclude Include="src\console.h" />
+    <ClInclude Include="src\shdSrc\text.h" />
+    <ClInclude Include="src\text.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

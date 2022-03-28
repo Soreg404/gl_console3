@@ -1,22 +1,18 @@
-#include "console.h"
+﻿#include "console.h"
 
-void glerr(const char *file, int line) {
-	int e = 0;
-	while(e = glGetError()) printf("[%s] %i: GL ERROR: %i\n", file, line, e);
-}
 
 Color::Color(float r, float g, float b, float a) : r(r), g(g), b(b), a(a) {}
 Color::Color(int r, int g, int b, int a) : r(r / 255.f), g(g / 255.f), b(b / 255.f), a(a / 255.f) {}
 Color::Color(float all) : r(all), g(all), b(all), a(1) {}
 Color::Color(int all) : r(all / 255.f), g(all / 255.f), b(all / 255.f), a(1) {}
 
-Console::Console(uint32_t w, uint32_t h): wW(w), wH(h), wWh(w/2), wHh(h/2) {}
+Console::Console(uint32_t w, uint32_t h): wW(w), wH(h), wWh(w/2), wHh(h/2) {
+	for(auto &i : proj) i = glm::mat4(1.f);
+}
 
 Console::~Console() {
 	terminateText();
 }
-
-void Console::create(uint32_t w, uint32_t h) { this->wW = w, this->wH = h; this->wWh = w/2, this->wHh = h/2; create(); }
 
 Console *getWUP(GLFWwindow *window) { return reinterpret_cast<Console *>(glfwGetWindowUserPointer(window)); }
 
@@ -26,7 +22,7 @@ void curposCallback(GLFWwindow *window, double xpos, double ypos) { getWUP(windo
 //void closeCallback(GLFWwindow *window) { getWUP(window)->close(); }
 void sizeCallback(GLFWwindow *window, int width, int height) { getWUP(window)->clb_size(width, height); }
 
-
+void Console::create(uint32_t w, uint32_t h) { wW = w, wH = h; create(); }
 void Console::create() {
 	
 	if(wnd) return;
@@ -38,7 +34,8 @@ void Console::create() {
 
 	glewInit();
 
-	glViewport(0, 0, wW, wH);
+	glfwSetWindowSizeLimits(wnd, 150, 200, -1, -1);
+	resize(wW, wH);
 
 	glfwSetKeyCallback(wnd, keyCallback);
 	glfwSetMouseButtonCallback(wnd, mouseButtonCallback);
@@ -51,7 +48,7 @@ void Console::create() {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	prepRenderer();
+	prepInterface();
 
 	prepText();
 
@@ -87,10 +84,34 @@ Console::operator bool() {
 	return wnd;
 }
 
-void Console::clb_key(int key, int scancode, int action, int mods) {}
+
+void Console::resize(uint32_t width, uint32_t height) {
+	glfwMakeContextCurrent(wnd);
+	wW = width, wWh = width / 2, wH = height, wHh = height / 2;
+	proj[0] = glm::ortho(0.f, static_cast<float>(wW), 0.f, static_cast<float>(wH), 1.f, 10.f);
+	glViewport(0, 0, wW, wH);
+}
+
+int tmpLog = 0;
+std::array<const wchar_t *, 5>tmpTexts = {
+	L"hello world",
+	L"sample text",
+	L"Lorem ipsum sit amet dolor",
+	L"zażółć gęślą jaźń",
+	L"猫がいる",
+};
+
+void Console::clb_key(int key, int scancode, int action, int mods) {
+
+	if(key == GLFW_KEY_ENTER && action) {
+		parseLogEntry(tmpTexts[glfwGetTimerValue() % tmpTexts.size()]);
+		repaint();
+	}
+
+}
 
 void Console::clb_curpos(double xpos, double ypos) {}
 
 void Console::clb_mouse(int button, int action, int mods) {}
 
-void Console::clb_size(int width, int height) { wW = width, wWh = width / 2, wH = height, wHh = height / 2; glViewport(0, 0, width, height); repaint(); }
+void Console::clb_size(int width, int height) { resize(width, height); repaint(); }

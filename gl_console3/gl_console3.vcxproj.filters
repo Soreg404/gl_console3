@@ -21,10 +21,13 @@
     <ClCompile Include="src\console.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\render.cpp">
+    <ClCompile Include="src\interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\text.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gl\gl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,7 +35,13 @@
     <ClInclude Include="src\console.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gl\ext_gl.h">
+    <ClInclude Include="gl\gl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\shdSrc\text.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\text.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
