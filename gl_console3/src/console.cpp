@@ -6,12 +6,11 @@ Color::Color(int r, int g, int b, int a) : r(r / 255.f), g(g / 255.f), b(b / 255
 Color::Color(float all) : r(all), g(all), b(all), a(1) {}
 Color::Color(int all) : r(all / 255.f), g(all / 255.f), b(all / 255.f), a(1) {}
 
-Console::Console(uint32_t w, uint32_t h): wW(w), wH(h), wWh(w/2), wHh(h/2) {
+Console::Console() {
 	for(auto &i : proj) i = glm::mat4(1.f);
 }
 
 Console::~Console() {
-	terminateText();
 }
 
 Console *getWUP(GLFWwindow *window) { return reinterpret_cast<Console *>(glfwGetWindowUserPointer(window)); }
@@ -22,12 +21,11 @@ void curposCallback(GLFWwindow *window, double xpos, double ypos) { getWUP(windo
 //void closeCallback(GLFWwindow *window) { getWUP(window)->close(); }
 void sizeCallback(GLFWwindow *window, int width, int height) { getWUP(window)->clb_size(width, height); }
 
-void Console::create(uint32_t w, uint32_t h) { wW = w, wH = h; create(); }
-void Console::create() {
-	
+void Console::create(uint32_t w, uint32_t h) {
+
 	if(wnd) return;
 
-	wnd = glfwCreateWindow(wW, wH, "console", nullptr, nullptr);
+	wnd = glfwCreateWindow(w, h, "console", nullptr, nullptr);
 	glfwMakeContextCurrent(wnd);
 
 	glfwSetWindowUserPointer(wnd, this);
@@ -35,7 +33,7 @@ void Console::create() {
 	glewInit();
 
 	glfwSetWindowSizeLimits(wnd, 150, 200, -1, -1);
-	resize(wW, wH);
+	resize(w, h);
 
 	glfwSetKeyCallback(wnd, keyCallback);
 	glfwSetMouseButtonCallback(wnd, mouseButtonCallback);
@@ -90,6 +88,10 @@ void Console::resize(uint32_t width, uint32_t height) {
 	wW = width, wWh = width / 2, wH = height, wHh = height / 2;
 	proj[0] = glm::ortho(0.f, static_cast<float>(wW), 0.f, static_cast<float>(wH), 1.f, 10.f);
 	glViewport(0, 0, wW, wH);
+
+	for(auto &e : buffer) {
+		e.repos(wW - layout.bar_left - layout.bar_right, 16);
+	}
 }
 
 int tmpLog = 0;

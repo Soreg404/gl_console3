@@ -8,7 +8,7 @@ int main() {
 	glfwInit();
 
 	Console con;
-	con.create();
+	con.create(400, 600);
 
 	while(con) {
 		

@@ -28,8 +28,10 @@ namespace shdSrc {
 		in vec2 texCoord;
 		out vec4 color;
 		layout(location=20)uniform sampler2D sampler[%i];
+		#define c(x) (((tc.y >> x) & 0xFF) / 255.f)
 		void main() {
-			color = vec4(1, 1, 1, texture(sampler[tc.x], texCoord).r);
+			color = vec4(c(24), c(16), c(8), texture(sampler[tc.x], texCoord).r * c(0));
+			//color = vec4(texCoord, 0, 1);
 
 			//color = vec4(texCoord, 0, 1);
 		}

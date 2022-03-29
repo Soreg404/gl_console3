@@ -9,12 +9,10 @@ class Console {
 
 public:
 
-	Console() = default;
-	Console(uint32_t width, uint32_t height);
+	Console();
 	~Console();
 
 	void create(uint32_t width, uint32_t height);
-	void create();
 
 	void close();
 
@@ -25,6 +23,8 @@ public:
 	operator bool();
 
 	void resize(uint32_t width, uint32_t height);
+
+
 
 	struct LAYOUT {
 		int bar_left = 20;
@@ -63,16 +63,15 @@ private:
 
 	void prepInterface();
 	void prepText();
-	void terminateText();
 
 	void drawIntf();
 	void drawText();
 
-	struct FT_LibraryRec_ *library = nullptr;
+	std::shared_ptr<Library> lib;
 
-	Font font;
+	std::shared_ptr<Font> font;
 
-	std::list<TextField> logs;
+	std::list<TextField> buffer;
 
 	std::array<glm::mat4, 2> proj;
 

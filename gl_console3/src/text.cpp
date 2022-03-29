@@ -6,15 +6,40 @@
 
 char TMPSTR[1000] = { 0 };
 
+const int MAX_CHARS_PER_BUFFER = 4000;
+
+#pragma pack(push, 1)
+struct Vertex {
+	float x, y;
+	int tex, color;
+	Vertex(float x = 0, float y = 0, int tex = 0, int color = 0): x(x), y(y), tex(tex), color(color) {}
+};
+
+struct Indice {
+	std::array<uint32_t, 6> v;
+	Indice() { memset(v.data(), 0, 6 * sizeof(uint32_t)); }
+	Indice(uint32_t b) {
+		uint32_t t[] = { b + 0, b + 1, b + 3, b + 1, b + 2, b + 3 };
+		memcpy_s(v.data(), 6 * sizeof(uint32_t), t, 6 * sizeof(uint32_t));
+	}
+};
+#pragma pack(pop)
+
 int TEXTURE_LIMIT = 1;
+
+#define FS_
 
 void Console::prepText() {
 	
-	FT_Init_FreeType(&library);
+	glProvokingVertex(GL_LAST_VERTEX_CONVENTION);
 
-	font.set(library, "C:/Windows/Fonts/BIZ-UDGothicR.ttc");
-	//font.set(library, "C:/Windows/Fonts/consolas.ttf");
-	FT_Set_Pixel_Sizes(font.face, 0, 60);
+	lib = std::make_shared<Library>();
+	font = std::make_shared<Font>(lib);
+
+	font->load("C:/Windows/Fonts/BIZ-UDGothicR.ttc");
+	font->load("C:/Windows/Fonts/consola.ttf");
+
+	font->setSize(0, 16);
 
 	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &TEXTURE_LIMIT);
 	LOG("texture units: %i", TEXTURE_LIMIT);
@@ -29,36 +54,11 @@ void Console::prepText() {
 
 void Console::parseLogEntry(const wchar_t *tmpLogText) {
 	TextField tmp;
-	tmp.width = wW - layout.bar_left - layout.bar_right;
-	tmp.scale = .8f;
-	tmp.lineHeight = 60 * tmp.scale;
 
-	tmp.set(font, tmpLogText);
+	tmp.text(font, tmpLogText);
+	tmp.repos(wW - layout.bar_left - layout.bar_right, 16);
 
-	logs.push_back(std::move(tmp));
-}
-
-size_t dc = 0;
-void drawTextContainer(TextField *tc) {
-
-	auto mapIt = tc->map.begin();
-	size_t mapCounter = 0;
-
-	for(size_t i = 0; i < tc->buffers.size(); i++) {
-		
-		glBindVertexArray(tc->buffers[i]);
-
-		// bind textures
-		for(size_t t = 0; t < TEXTURE_LIMIT && mapCounter < tc->map.size(); t++, mapIt++, mapCounter++) {
-			glActiveTexture(GL_TEXTURE0 + t);
-			glBindTexture(GL_TEXTURE_2D, mapIt->second.tex);
-		}
-
-		//LOG("DRAW CALL %zu", dc);
-		dc++;
-		glDrawArrays(GL_QUADS, 0, 600);
-	}
-
+	buffer.push_back(std::move(tmp));
 }
 
 void Console::drawText() {
@@ -74,16 +74,16 @@ void Console::drawText() {
 	GLERR;
 
 	glUniformMatrix4fv(0, 1, GL_FALSE, glm::value_ptr(glm::ortho(0.f, static_cast<float>(vW), 0.f, static_cast<float>(vH), 1.f, 10.f)));
-	
+
 
 	GLERR;
 
 	int yPos = 0;
-	for(auto it = logs.rbegin(); it != logs.rend(); it++) {
+	for(auto it = buffer.rbegin(); it != buffer.rend(); it++) {
 		if(yPos > vH) break;
-		yPos += it->lineHeight * it->lines + 16;
+		yPos += it->getLineHeight() * it->getLines() + 16;
 		glUniform2f(1, 0, yPos);
-		drawTextContainer(&(*it));
+		it->draw();
 	}
 
 	GLERR;
@@ -93,18 +93,77 @@ void Console::drawText() {
 }
 
 
-charmap buildCharmap(const wchar_t *text) {
-	charmap ret;
-	for(size_t i = 0; text[i]; i++) ret[text[i]];
-	return std::move(ret);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+Font::Font(std::shared_ptr<Library> l): lib(l) {}
+
+Font::~Font() { FT_Done_Face(face); }
+
+void Font::load(const char *path) {
+	FT_Done_Face(face);
+	if(!FT_New_Face(lib->get(), path, 0, &face)) {
+		index.clear();
+	} else LOG("an error occured while loading font face");
 }
 
-CharInfo loadCharTex(FT_Face &face, wchar_t c) {
+void Font::setSize(uint32_t w, uint32_t h) { FT_Set_Pixel_Sizes(face, w, h); this->w = w; this->h = h; }
+
+Library::Library() {
+	FT_Init_FreeType(&library);
+	glGenBuffers(1, &m_EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+	Indice *inds = new Indice[MAX_CHARS_PER_BUFFER];
+	for(uint32_t i = 0, vbuffCounter = 0; i < MAX_CHARS_PER_BUFFER; i++, vbuffCounter += 4)
+		inds[i] = { vbuffCounter };
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_CHARS_PER_BUFFER * 6 * sizeof(uint32_t), inds, GL_STATIC_DRAW);
+	delete[]inds;
+}
+
+Library::~Library() { FT_Done_FreeType(library); }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+TextField::~TextField() {
+
+}
+
+size_t dc = 0;
+void TextField::draw() {
+	if(!font) return;
+
+	auto mapIt = map.begin();
+	size_t mapCounter = 0;
+
+	for(size_t i = 0; i < buffers.size(); i++) {
+
+		glBindVertexArray(buffers[i][0]);
+
+		// bind textures
+		for(size_t t = 0; t < TEXTURE_LIMIT && mapCounter < map.size(); t++, mapIt++, mapCounter++) {
+			glActiveTexture(GL_TEXTURE0 + t);
+			glBindTexture(GL_TEXTURE_2D, font->index[mapIt->first].tex);
+		}
+
+		//LOG("DRAW CALL %zu", dc);
+		dc++;
+		//glDrawArrays(GL_QUADS, 0, 600);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, font->lib->EBO());
+		glDrawElements(GL_TRIANGLES, 200, GL_UNSIGNED_INT, (void *)0);
+	}
+
+}
+
+
+void TextField::buildCharmap() { for(size_t i = 0; data[i]; i++) map[data[i]]; }
+
+CharIndexed loadCharTex(FT_Face &face, wchar_t c) {
 	if(FT_Load_Char(face, c, FT_LOAD_RENDER)) {
 		LOG("failed to load glyph '%c'", c);
 		return {};
 	}
-	CharInfo ret;
+	CharIndexed ret;
 	FT_GlyphSlot sl = face->glyph;
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	// generate texture
@@ -135,89 +194,76 @@ CharInfo loadCharTex(FT_Face &face, wchar_t c) {
 
 	return ret;
 }
-void assignTextures(Font &face, charmap *m) {
-	for(auto &it : *m) {
-		CharInfo *currTexName = &(face.index)[it.first];
-		if(!currTexName->tex) *currTexName = loadCharTex(face.face, it.first);
-		it.second = *currTexName;
+void TextField::assignTextures() {
+	for(auto &it : map) {
+		// if texture for current char is just created - load it and store
+		CharIndexed *currTexName = &(font->index)[it.first];
+		if(!currTexName->tex) *currTexName = loadCharTex(font->face, it.first);
 	}
 }
 
-void setPositions(TextField *cont, const wchar_t *text, float scale, int width, int lineHeight) {
-
-	charmap *m = &cont->map;
-
+void TextField::setPositions() {
 	float advance = 0;
-	int line = 1;
-
-	float x = 0, y = 0, w = 0, h = 0;
-
 	wchar_t c = 0;
-	for(size_t i = 0; c = text[i]; i++) {
-		auto found = m->find(c);
-		if(found == m->end()) continue;
-		CharInfo *ci = &found->second;
+	for(size_t i = 0; c = data[i]; i++) {
+		auto found = font->index.find(c);
+		if(found == font->index.end()) continue;
+		CharIndexed ci = found->second;
 
-		if((advance + ci->w) * scale > width) { line++; advance = 0; }
+		CharMapped pos;
 
-		x = (advance + ci->l) * scale;
-		y = -(line * lineHeight) + ci->t * scale;
-		w = ci->w * scale;
-		h = ci->h * scale;
+		if((advance + ci.w) * scale > width) { lines++; advance = 0; }
 
-		ci->pos.push_back({ x, y, w, h });
+		pos.x = (advance + ci.l) * scale;
+		pos.y = -((lines + 1) * lineHeight) + ci.t * scale;
+		pos.w = ci.w * scale;
+		pos.h = ci.h * scale;
 
-		advance += (ci->a >> 6);
+		map[c].push_back(pos);
 
+		advance += (ci.a >> 6);
 	}
-	cont->width = 200;
-	cont->lines = line;
 }
 
-#pragma pack(push, 1)
-struct Vertex {
-	float x = 0, y = 0;
-	int tex = 0;
-	int color = 0;
-	Vertex() {}
-	Vertex(float x, float y, int tex, int color): x(x), y(y), tex(tex), color(color) {}
-};
-#pragma pack(pop)
-void setBuffers(TextField *cont) {
+void TextField::setBuffers(bool repos /* tmp */) {
 	
-	cont->buffers = std::vector<GLuint>(cont->map.size() / TEXTURE_LIMIT + 1);
+	// MAX_CHARS_PER_BUFFER ???
+	if(!repos) buffers = std::vector<std::array<GLuint, 2>>(map.size() / TEXTURE_LIMIT + 1);
 
-	auto mapIt = cont->map.begin(), mapIt2 = mapIt;
+	auto mapIt = map.begin(), mapIt2 = mapIt;
 	size_t mapCounter = 0, mapCounter2 = 0;
 
 
-	for(size_t i = 0; i < cont->buffers.size(); i++) {
-		glGenVertexArrays(1, &cont->buffers[i]);
-		glBindVertexArray(cont->buffers[i]);
-		GLuint VBO = 0;
-		glGenBuffers(1, &VBO);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	for(size_t i = 0; i < buffers.size(); i++) {
+
+		if(!repos) {
+			glGenVertexArrays(1, &buffers[i][0]);
+			glGenBuffers(1, &buffers[i][1]);
+		}
+		glBindVertexArray(buffers[i][0]);
+		glBindBuffer(GL_ARRAY_BUFFER, buffers[i][1]);
 
 		size_t totalCharCount = 0;
-		for(size_t t = 0; t < TEXTURE_LIMIT && mapCounter2 < cont->map.size(); t++, mapIt2++, mapCounter2++) { // <- ¯\_(ツ)_/¯
-			totalCharCount += mapIt2->second.pos.size();
+		for(size_t t = 0; t < TEXTURE_LIMIT && mapCounter2 < map.size(); t++, mapIt2++, mapCounter2++) { // <- ¯\_(ツ)_/¯
+			totalCharCount += mapIt2->second.size();
 		}
 		if(!totalCharCount) continue;
 
 		Vertex *verts = new Vertex[4 * totalCharCount];
 		size_t vert_counter = 0;
 
-		for(size_t t = 0; t < TEXTURE_LIMIT && mapCounter < cont->map.size(); t++, mapIt++, mapCounter++) { // <- ¯\_(ツ)_/¯ x2
+		for(size_t t = 0; t < TEXTURE_LIMIT && mapCounter < map.size(); t++, mapIt++, mapCounter++) { // <- ¯\_(ツ)_/¯ x2
 
-			for(auto &cp : mapIt->second.pos) {
-				verts[vert_counter * 4 + 0] = Vertex(cp.x, cp.y, t, ~0);
-				verts[vert_counter * 4 + 1] = Vertex(cp.x, cp.y - cp.w, t, ~0);
-				verts[vert_counter * 4 + 2] = Vertex(cp.x + cp.z, cp.y - cp.w, t, ~0);
-				verts[vert_counter * 4 + 3] = Vertex(cp.x + cp.z, cp.y, t, ~0);
+			for(auto &cp : mapIt->second) {
+				verts[vert_counter * 4 + 0] = Vertex(cp.x, cp.y, t, 0);
+				verts[vert_counter * 4 + 1] = Vertex(cp.x, cp.y - cp.h, t, 0);
+				verts[vert_counter * 4 + 2] = Vertex(cp.x + cp.w, cp.y - cp.h, t, 0);
+				verts[vert_counter * 4 + 3] = Vertex(cp.x + cp.w, cp.y, t, ~0);
 				vert_counter++;
 			}
 		}
-		glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * totalCharCount * 4, verts, GL_STATIC_DRAW);
+		if(!repos) glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * totalCharCount * 4, verts, GL_DYNAMIC_DRAW);
+		else glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Vertex) * totalCharCount * 4, verts);
 		delete[]verts;
 
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(0));
@@ -233,29 +279,35 @@ void setBuffers(TextField *cont) {
 }
 
 
-void TextField::set(Font &face, const wchar_t *ndata) {
-	if(data) delete[]data;
-	size_t len = wcslen(ndata) + 1;
-	data = new wchar_t[len];
-	wcscpy_s(data, len, ndata);
+void TextField::text(std::shared_ptr<Font>f, const wchar_t *ndata) {
+	font = f;
+	size_t nLen = wcslen(ndata);
+	if(data && nLen > dLen)
+		data = reinterpret_cast<wchar_t *>(realloc(data, nLen + 1));
+	else if(!data) data = new wchar_t[nLen + 1];
+	dLen = nLen;
+	wcscpy_s(data, dLen + 1, ndata);
 
-	map = buildCharmap(data);
-	assignTextures(face, &map);
+	buildCharmap();
+	assignTextures();
 
-	setPositions(this, data, scale, width, lineHeight);
+	setPositions();
 
-	setBuffers(this);
-
+	setBuffers();
 }
 
 
-void Console::terminateText() {
-	FT_Done_Face(font.face);
-	FT_Done_FreeType(library);
-}
+// tmp
+void TextField::repos(int w, int lh, float s) {
+	width = w;
+	lineHeight = lh;
+	scale = s;
 
-void Font::set(struct FT_LibraryRec_ *library, const char *path) {
-	if(!FT_New_Face(library, path, 0, &face)) {
-		index.clear();
-	} else LOG("an error occured while loading font face");
+	map.clear();
+	buildCharmap();
+	assignTextures();
+
+	setPositions();
+
+	setBuffers(true);
 }
