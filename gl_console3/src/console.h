@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #define GLEW_STATIC
 #include "../gl/gl.h"
@@ -58,6 +58,9 @@ private:
 	friend void sizeCallback(GLFWwindow *window, int width, int height);
 	void clb_size(int width, int height);
 
+	friend void charCallback(GLFWwindow *window, unsigned int codepoint);
+	void clb_char(char32_t codepoint);
+
 
 #pragma endregion
 
@@ -71,7 +74,11 @@ private:
 
 	std::shared_ptr<Font> font;
 
-	std::list<TextField> buffer;
+	size_t logBufferHead = 0;
+	std::vector<TextField> logBuffer;
+
+	std::wstring inputData = L"█ ";
+	TextField input;
 
 	std::array<glm::mat4, 2> proj;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <map>
 #include <list>
 #include <array>
 
@@ -13,24 +14,23 @@ struct CharIndexed {
 	int w = 0, h = 0, l = 0, t = 0, a = 0;
 };
 
-struct CharMapped {
+struct CharBox {
 	float x = 0, y = 0, w = 0, h = 0;
 };
-
-// for every font face and char size
-typedef std::unordered_map<wchar_t, CharIndexed> charindex;
-// for every tex container
-typedef std::unordered_map<wchar_t, std::list<CharMapped>> charmap;
+typedef std::map<wchar_t, std::vector<CharBox>> charmap;
 
 struct Library {
 	Library();
 	~Library();
 	inline struct FT_LibraryRec_ *get() { return library; }
 	inline GLuint EBO() { return m_EBO; }
+	inline void bindShd() const { glUseProgram(m_shd); }
+	inline GLint texLimit() const { return m_texLimit; }
 
 private:
 	struct FT_LibraryRec_ *library = nullptr;
-	GLuint m_EBO = 0;
+	GLuint m_EBO = 0, m_shd = 0;
+	GLint m_texLimit = 0;
 };
 
 class Font {
@@ -43,15 +43,23 @@ public:
 	void load(const char *path);
 	void setSize(uint32_t w, uint32_t h);
 
-private:
-	uint32_t w, h;
+	inline struct { uint32_t w, h; } getSize() const { return { w, h }; }
 
-	charindex index;
+private:
+	uint32_t w = 0, h = 0;
+
+	std::unordered_map<wchar_t, CharIndexed> index;
 
 	struct FT_FaceRec_ *face = nullptr;
 	std::shared_ptr<Library> lib;
 };
 
+
+struct BufferChunk {
+	GLuint VAO = 0, VBO = 0;
+	size_t total_count = 0;
+	charmap::iterator head;
+};
 
 class TextField {
 
@@ -59,7 +67,7 @@ public:
 
 	~TextField();
 
-	void draw();
+	void draw(float x, float y);
 
 	void text(std::shared_ptr<Font> font, const wchar_t *data);
 	void repos(int width, int lineHeight, float scale = 1.f);
@@ -67,7 +75,7 @@ public:
 private:
 	uint32_t status = 0;
 
-	std::vector<std::array<GLuint, 2>> buffers;
+	std::vector<BufferChunk> buffers;
 	size_t nBuffs = 0; // TODO
 	wchar_t *data = nullptr;
 	size_t dLen = 0;
@@ -78,13 +86,13 @@ private:
 	int lines = 0;
 	charmap map;
 
-	void clearTextures();
-	void clearBuffers();
+	bool isClear = true;
+	void clear();
 
 	void buildCharmap();
 	void assignTextures();
 	void setPositions();
-	void setBuffers(bool repos = false);
+	void setBuffers();
 
 	std::shared_ptr<Font> font;
 
