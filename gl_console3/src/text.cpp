@@ -308,7 +308,7 @@ void TextField::text(std::shared_ptr<Font>f, const wchar_t *ndata) {
 	font = f;
 	size_t nLen = wcslen(ndata);
 	if(data && nLen > dLen) {
-		wchar_t *tmp = reinterpret_cast<wchar_t *>(realloc(data, nLen + 1));
+		wchar_t *tmp = reinterpret_cast<wchar_t *>(realloc(data, (nLen + 1) * sizeof(wchar_t)));
 		if(tmp) data = tmp;
 		else {
 			delete[]data;
